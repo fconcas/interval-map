@@ -1,0 +1,9 @@
+CC=g++
+CFLAGS=-I.
+DEPS=interval_map.h
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+main: main.o
+	$(CC) -o main main.o
