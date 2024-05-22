@@ -1,389 +1,296 @@
+#include <cassert>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <ostream>
 #include <vector>
 
 #include "interval_map.hpp"
 
-template <
-    typename Key,
-    typename T,
-    typename Map = std::map<Key, T>
->
-void test_err(Map ref_map, Map res_map, int test_number)
-{
-    std::cerr << "Test " << test_number << " failed. Resulting map should be:\n";
-
-    for (auto it = ref_map.begin(); it != ref_map.end(); it++) {
-        std::cerr << "  " << it->first << " -> " << it->second << '\n';
+#define compare_not_passed( a, b ) { \
+    std::cerr << "Test \"" << __FUNCTION__ << "\" not passed on " << a << " and " << b << "\n"; \
+    exit(1); \
     }
 
-    std::cerr << "but is instead:\n";
-
-    for (auto it = res_map.begin(); it != res_map.end(); it++) {
-        std::cerr << "  " << it->first << " -> " << it->second << '\n';
+#define assert_ref( x, ref ) \
+    if (x != ref) { \
+        std::cerr << "Test \"" << __FUNCTION__ << "\" not passed: map " << x << " should be " << ref << "\n"; \
+        exit(1); \
     }
 
-    exit(1);
+
+template<class Key, class T, class Compare, class Allocator, class Container>
+std::ostream& operator<<(std::ostream& os, const interval_map<Key, T, Compare, Allocator, Container>& imap)
+{
+    auto it = imap.begin();
+
+    os << "{" << imap.get_first_val() << ", ";
+
+    if (it != imap.end()) {
+        os << "(" << it->first << ", " << it->second << ")";
+        it++;
+    }
+
+    for (; it != imap.end(); it++) {
+        os << ", (" << it->first << ", " << it->second << ")";
+    }
+
+    os << "}";
+
+    return os;
 }
 
-void test_1()
+
+void test_operator_eq()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[15] = 'A';
+    interval_map<int, char> a('A', {  });
+    interval_map<int, char> b('A', {  });
+    if (!(a == b))  compare_not_passed(a, b);
+
+    a = interval_map<int, char>('A', { {3, 'B'} });
+    b = interval_map<int, char>('A', { {3, 'B'} });
+    if (!(a == b))  compare_not_passed(a, b);
+
+    a = interval_map<int, char>('A', { {3, 'B'} });
+    b = interval_map<int, char>('B', { {3, 'B'} });
+    if (a == b)  compare_not_passed(a, b);
+
+    a = interval_map<int, char>('A', { {3, 'B'} });
+    b = interval_map<int, char>('A', { {3, 'C'} });
+    if (a == b)  compare_not_passed(a, b);
+}
+
+void test_operator_neq()
+{
+    interval_map<int, char> a('A', {  });
+    interval_map<int, char> b('A', {  });
+    if (a != b)  compare_not_passed(a, b);
+
+    a = interval_map<int, char>('A', { {3, 'B'} });
+    b = interval_map<int, char>('A', { {3, 'B'} });
+    if (a != b)  compare_not_passed(a, b);
+
+    a = interval_map<int, char>('A', { {3, 'B'} });
+    b = interval_map<int, char>('B', { {3, 'B'} });
+    if (!(a != b))  compare_not_passed(a, b);
+
+    a = interval_map<int, char>('A', { {3, 'B'} });
+    b = interval_map<int, char>('A', { {3, 'C'} });
+    if (!(a != b))  compare_not_passed(a, b);
+}
+
+
+void test_set_first_val()
+{
+    interval_map<int, char> ref_imap('B', {  });
+
+    interval_map<int, char> imap('A', {  });
+    imap.set_first_val('B');
+
+    assert_ref(imap, ref_imap);
+}
+
+
+void test_insert()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'} });
+
+    interval_map<int, char> imap('A', {  });
+    imap.insert(3, 'B');
+
+    assert_ref(imap, ref_imap);
+}
+
+void test_insert_overwrite()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'D'}, {9, 'A'} });
+
+    interval_map<int, char> imap('A', { {3, 'B'}, {6, 'C'}, {9, 'A'} });
+    imap.insert(6, 'D');
+
+    assert_ref(imap, ref_imap);
+}
+
+void test_insert_overwrite_first_val()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'A'} });
+
+    interval_map<int, char> imap('A', { {3, 'B'}, {6, 'C'}, {9, 'A'} });
+    imap.insert(6, 'A');
+
+    assert_ref(imap, ref_imap);
+}
+
+
+void test_insert_range()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {12, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
+    imap.insert_range(3, 12, 'B');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 1);
+    assert_ref(imap, ref_imap);
 }
 
-void test_2()
+void test_insert_range_overwrite_between()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[2] = 'C';
-    ref_map[7] = 'B';
-    ref_map[15] = 'A';
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'C'}, {9, 'B'}, {12, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 2);
+    assert_ref(imap, ref_imap);
 }
 
-void test_3()
+void test_insert_range_overwrite_first()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[2] = 'C';
-    ref_map[4] = 'D';
-    ref_map[12] = 'B';
-    ref_map[15] = 'A';
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'D'}, {8, 'C'}, {9, 'B'}, {12, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
-    imap.assign(4, 12, 'D');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(6, 8, 'D');
 
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 3);
+    assert_ref(imap, ref_imap);
 }
 
-void test_4()
+void test_insert_range_overwrite_last()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[2] = 'C';
-    ref_map[4] = 'D';
-    ref_map[10] = 'E';
-    ref_map[14] = 'B';
-    ref_map[15] = 'A';
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'C'}, {7, 'D'}, {9, 'B'}, {12, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
-    imap.assign(4, 12, 'D');
-    imap.assign(10, 14, 'E');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(7, 9, 'D');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 4);
+    assert_ref(imap, ref_imap);
 }
 
-void test_5()
+void test_insert_range_overwrite_first_and_last()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[4] = 'D';
-    ref_map[10] = 'E';
-    ref_map[14] = 'B';
-    ref_map[15] = 'A';
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'D'}, {9, 'B'}, {12, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
-    imap.assign(4, 12, 'D');
-    imap.assign(10, 14, 'E');
-    imap.assign(2, 4, 'B');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(6, 9, 'D');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 5);
+    assert_ref(imap, ref_imap);
 }
 
-void test_6()
+void test_insert_range_overwrite_cross()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[15] = 'A';
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {5, 'D'}, {7, 'C'}, {9, 'B'}, {12, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
-    imap.assign(4, 12, 'D');
-    imap.assign(10, 14, 'E');
-    imap.assign(2, 14, 'B');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(5, 7, 'D');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 6);
+    assert_ref(imap, ref_imap);
 }
 
-void test_7()
+void test_insert_range_overwrite_all()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[2] = 'C';
-    ref_map[15] = 'A';
+    interval_map<int, char> ref_imap('A', { {3, 'D'}, {12, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
-    imap.assign(4, 12, 'D');
-    imap.assign(10, 14, 'E');
-    imap.assign(3, 15, 'C');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(3, 12, 'D');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 7);
+    assert_ref(imap, ref_imap);
 }
 
-void test_8()
+void test_insert_range_first_val()
 {
-    std::map<int, char> ref_map;
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'C'}, {7, 'A'} });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
-    imap.assign(4, 12, 'D');
-    imap.assign(10, 14, 'E');
-    imap.assign(1, 15, 'A');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(7, 12, 'A');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 8);
+    assert_ref(imap, ref_imap);
 }
 
-void test_9()
+void test_insert_range_first_val_overwrite_all()
 {
-    std::map<int, char> ref_map;
-    ref_map[14] = 'B';
-    ref_map[15] = 'A';
+    interval_map<int, char> ref_imap('A', { });
 
     interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.assign(2, 7, 'C');
-    imap.assign(4, 12, 'D');
-    imap.assign(10, 14, 'E');
-    imap.assign(1, 14, 'A');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(3, 12, 'A');
 
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 9);
+    assert_ref(imap, ref_imap);
 }
 
-void test_10()
+
+void test_swap()
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[3] = 'C';
-    ref_map[5] = 'A';
+    interval_map<int, char> ref_1('A', { {3, 'B'}, {6, 'C'}, {9, 'B'}, {12, 'A'} });
+    interval_map<int, char> ref_2('D', { {3, 'E'}, {6, 'F'}, {9, 'E'}, {12, 'D'} });
 
-    interval_map<int, char> imap('A');
-    imap.assign(1, 3, 'B');
-    imap.assign(3, 5, 'C');
+    interval_map<int, char> map_1('D', { {3, 'E'}, {6, 'F'}, {9, 'E'}, {12, 'D'} });
+    interval_map<int, char> map_2('A', { {3, 'B'}, {6, 'C'}, {9, 'B'}, {12, 'A'} });
 
-    std::map<int, char> res_map = imap.get_map();
+    std::swap(map_1, map_2);
 
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 10);
+    assert_ref(map_1, ref_1);
+    assert_ref(map_2, ref_2);
 }
 
-void test_11()
+
+std::chrono::duration<double> benchmark_imap(
+    interval_map<int, int>& imap,
+    int n_tests,
+    int key_begin_size,
+    int key_end_size,
+    int val_size
+)
 {
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[3] = 'C';
-    ref_map[5] = 'D';
-    ref_map[7] = 'A';
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 3, 'B');
-    imap.assign(3, 5, 'C');
-    imap.assign(5, 7, 'D');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 11);
+    const auto start{ std::chrono::steady_clock::now() };
+    for (int i = 0; i < n_tests; i++) {
+        imap.insert_range(rand() % key_begin_size, rand() % key_end_size, rand() % val_size);
+    }
+    const auto end{ std::chrono::steady_clock::now() };
+    const std::chrono::duration<double> elapsed_seconds{ end - start };
+    return elapsed_seconds;
 }
-
-void test_12()
-{
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[3] = 'C';
-    ref_map[7] = 'A';
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 3, 'B');
-    imap.assign(3, 5, 'C');
-    imap.assign(5, 7, 'C');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 12);
-}
-
-void test_13()
-{
-    std::map<int, char> ref_map;
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 3, 'B');
-    imap.assign(3, 5, 'C');
-    imap.assign(1, 7, 'A');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 13);
-}
-
-void test_14()
-{
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[5] = 'A';
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 3, 'B');
-    imap.assign(3, 5, 'C');
-    imap.assign(3, 5, 'B');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 14);
-}
-
-void test_15()
-{
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[15] = 'A';
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.set_pair(2, 'B');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 15);
-}
-
-void test_16()
-{
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 3, 'B');
-    imap.set_pair(3, 'B');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 16);
-}
-
-void test_17()
-{
-    std::map<int, char> ref_map;
-    ref_map[1] = 'B';
-    ref_map[2] = 'C';
-    ref_map[15] = 'A';
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.set_pair(2, 'C');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 17);
-}
-
-void test_18()
-{
-    std::map<int, char> ref_map;
-    ref_map[1] = 'C';
-    ref_map[15] = 'A';
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.set_pair(1, 'C');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 18);
-}
-
-void test_19()
-{
-    std::map<int, char> ref_map;
-
-    interval_map<int, char> imap('A');
-    imap.assign(1, 15, 'B');
-    imap.set_pair(1, 'A');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 19);
-}
-
-void test_20()
-{
-    std::map<int, char> ref_map;
-
-    interval_map<int, char> imap('A');
-    imap.assign(14, 15, 'B');
-    imap.assign(1, 15, 'A');
-
-    std::map<int, char> res_map = imap.get_map();
-
-    if (ref_map != res_map)  test_err<int, char>(ref_map, res_map, 19);
-}
-
-void (*tests[])() = { test_1, test_2, test_3, test_4, test_5, test_6, test_7, test_8, test_9, test_10, test_11, test_12, test_13, test_14, test_15, test_16, test_17, test_18, test_19, test_20 };
 
 
 int main()
 {
-    std::srand(0);
+    void (*tests[])() = {
+        test_operator_eq,
+        test_operator_neq,
+        test_set_first_val,
+        test_insert,
+        test_insert_overwrite,
+        test_insert_overwrite_first_val,
+        test_insert_range,
+        test_insert_range_overwrite_between,
+        test_insert_range_overwrite_first,
+        test_insert_range_overwrite_last,
+        test_insert_range_overwrite_first_and_last,
+        test_insert_range_overwrite_cross,
+        test_insert_range_overwrite_all,
+        test_insert_range_first_val,
+        test_insert_range_first_val_overwrite_all,
+        test_swap
+    };
 
     for (auto it = std::cbegin(tests); it != std::cend(tests); it++) {
         (*it)();
     }
 
-    std::cout << "All test passed!\n";
-
-    std::cout << "Benchmarking assign function...\n";
-
-    const auto start{ std::chrono::steady_clock::now() };
+    std::cout << "All test passed!\nBenchmarking insert_range function...\n";
 
     interval_map<int, int> imap(0);
-
-    for (int i = 1; i < 2000; i++) {
-        imap.assign(rand() % 100, rand() % 100, rand() % 20);
-    }
-
-    const auto end{ std::chrono::steady_clock::now() };
-    const std::chrono::duration<double> elapsed_seconds{ end - start };
-
+    std::srand(0);
+    const std::chrono::duration<double> elapsed_seconds = benchmark_imap(imap, 2000, 100, 100, 20);
     std::cout << "Benchmark completed in " << elapsed_seconds.count() << " seconds.\n";
 
     return 0;
