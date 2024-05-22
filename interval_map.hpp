@@ -6,9 +6,11 @@
 /**
  * Class implementing interval map.
  *
- * @tparam Key the type of the key
- * @tparam T the type of the values
- * @tparam Compare callable defining a strict weak ordering for the keys
+ * @tparam Key The type of the key
+ * @tparam T The type of the values
+ * @tparam Compare Callable defining a strict weak ordering for the keys
+ * @tparam Allocator Allocator of each element in the container
+ * @tparam Container Container used inside the class
  */
 template<class Key, class T, class Compare, class Allocator, class Container>
 class interval_map;
