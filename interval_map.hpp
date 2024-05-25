@@ -155,7 +155,18 @@ public:
     /**
      * Sets the first value.
      */
-    void set_first_val(const mapped_type& val) { first_val_ = val; }
+    void set_first_val(const mapped_type& val)
+    { 
+        first_val_ = val;
+        
+        if (!c_.empty()) {
+            auto it = c_.begin();
+            
+            if (it->second == val) {
+                c_.erase(it);
+            }
+        }
+    }
 
     /**
      * Returns a const reference to the first value.
