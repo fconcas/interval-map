@@ -10,13 +10,14 @@
 #define compare_not_passed( a, b ) { \
     std::cerr << "Test \"" << __FUNCTION__ << "\" not passed on " << a << " and " << b << "\n"; \
     exit(1); \
-    }
+}
 
-#define assert_ref( x, ref ) \
+#define assert_ref( x, ref ) { \
     if (x != ref) { \
         std::cerr << "Test \"" << __FUNCTION__ << "\" not passed: map " << x << " should be " << ref << "\n"; \
         exit(1); \
-    }
+    } \
+}
 
 
 template<class Key, class T, class Compare, class Allocator, class Container>
@@ -90,6 +91,16 @@ void test_set_first_val()
     assert_ref(imap, ref_imap);
 }
 
+void test_set_first_val_eq_to_first_in_set()
+{
+    interval_map<int, char> ref_imap('B', { {6, 'A'} });
+
+    interval_map<int, char> imap('A', { {3, 'B'}, {6, 'A'} });
+    imap.set_first_val('B');
+
+    assert_ref(imap, ref_imap);
+}
+
 
 void test_insert()
 {
@@ -111,12 +122,52 @@ void test_insert_overwrite()
     assert_ref(imap, ref_imap);
 }
 
-void test_insert_overwrite_first_val()
+void test_insert_overwrite_same_as_next()
 {
     interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'A'} });
 
     interval_map<int, char> imap('A', { {3, 'B'}, {6, 'C'}, {9, 'A'} });
     imap.insert(6, 'A');
+
+    assert_ref(imap, ref_imap);
+}
+
+void test_insert_overwrite_same_as_prev()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {9, 'A'} });
+
+    interval_map<int, char> imap('A', { {3, 'B'}, {6, 'C'}, {9, 'A'} });
+    imap.insert(6, 'B');
+
+    assert_ref(imap, ref_imap);
+}
+
+void test_insert_overwrite_first()
+{
+    interval_map<int, char> ref_imap('A', { {6, 'C'}, {9, 'A'} });
+
+    interval_map<int, char> imap('A', { {3, 'B'}, {6, 'C'}, {9, 'A'} });
+    imap.insert(3, 'A');
+
+    assert_ref(imap, ref_imap);
+}
+
+void test_insert_overwrite_penultimate()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'A'} });
+
+    interval_map<int, char> imap('A', { {3, 'B'}, {6, 'C'}, {9, 'A'} });
+    imap.insert(6, 'A');
+
+    assert_ref(imap, ref_imap);
+}
+
+void test_insert_overwrite_last()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'C'} });
+
+    interval_map<int, char> imap('A', { {3, 'B'}, {6, 'C'}, {9, 'A'} });
+    imap.insert(9, 'C');
 
     assert_ref(imap, ref_imap);
 }
@@ -155,7 +206,7 @@ void test_insert_range_overwrite_first()
     assert_ref(imap, ref_imap);
 }
 
-void test_insert_range_overwrite_last()
+void test_insert_range_overwrite_second()
 {
     interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'C'}, {7, 'D'}, {9, 'B'}, {12, 'A'} });
 
@@ -167,7 +218,7 @@ void test_insert_range_overwrite_last()
     assert_ref(imap, ref_imap);
 }
 
-void test_insert_range_overwrite_first_and_last()
+void test_insert_range_overwrite_first_and_second()
 {
     interval_map<int, char> ref_imap('A', { {3, 'B'}, {6, 'D'}, {9, 'B'}, {12, 'A'} });
 
@@ -227,6 +278,30 @@ void test_insert_range_first_val_overwrite_all()
     assert_ref(imap, ref_imap);
 }
 
+void test_insert_range_extend_previous()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {7, 'C'}, {9, 'B'}, {12, 'A'} });
+
+    interval_map<int, char> imap('A');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(4, 7, 'B');
+
+    assert_ref(imap, ref_imap);
+}
+
+void test_insert_range_extend_next()
+{
+    interval_map<int, char> ref_imap('A', { {3, 'B'}, {5, 'C'}, {9, 'B'}, {12, 'A'} });
+
+    interval_map<int, char> imap('A');
+    imap.insert_range(3, 12, 'B');
+    imap.insert_range(6, 9, 'C');
+    imap.insert_range(5, 7, 'C');
+
+    assert_ref(imap, ref_imap);
+}
+
 
 void test_swap()
 {
@@ -267,18 +342,25 @@ int main()
         test_operator_eq,
         test_operator_neq,
         test_set_first_val,
+        test_set_first_val_eq_to_first_in_set,
         test_insert,
         test_insert_overwrite,
-        test_insert_overwrite_first_val,
+        test_insert_overwrite_same_as_next,
+        test_insert_overwrite_same_as_prev,
+        test_insert_overwrite_first,
+        test_insert_overwrite_penultimate,
+        test_insert_overwrite_last,
         test_insert_range,
         test_insert_range_overwrite_between,
         test_insert_range_overwrite_first,
-        test_insert_range_overwrite_last,
-        test_insert_range_overwrite_first_and_last,
+        test_insert_range_overwrite_second,
+        test_insert_range_overwrite_first_and_second,
         test_insert_range_overwrite_cross,
         test_insert_range_overwrite_all,
         test_insert_range_first_val,
         test_insert_range_first_val_overwrite_all,
+        test_insert_range_extend_previous,
+        test_insert_range_extend_next,
         test_swap
     };
 
