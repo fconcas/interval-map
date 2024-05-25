@@ -380,4 +380,10 @@ namespace std {
     }
 }
 
+template <class Container>
+interval_map(Container) -> interval_map<typename Container::key_type, typename Container::mapped_type>;
+
+template <class Container, class Allocator>
+interval_map(Container, Allocator) -> interval_map<typename Container::key_type, typename Container::mapped_type>;
+
 #endif
