@@ -154,6 +154,8 @@ public:
 
     /**
      * Sets the first value.
+     * 
+     * @param val value to be assigned
      */
     void set_first_val(const mapped_type& val)
     { 
@@ -170,6 +172,8 @@ public:
 
     /**
      * Returns a const reference to the first value.
+     * 
+     * @return the const reference to the first value
      */
     const mapped_type& get_first_val() const noexcept { return first_val_; }
 
