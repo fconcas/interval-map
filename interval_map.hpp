@@ -154,16 +154,16 @@ public:
 
     /**
      * Sets the first value.
-     * 
+     *
      * @param val value to be assigned
      */
     void set_first_val(const mapped_type& val)
-    { 
+    {
         first_val_ = val;
-        
+
         if (!c_.empty()) {
             auto it = c_.begin();
-            
+
             if (it->second == val) {
                 c_.erase(it);
             }
@@ -172,7 +172,7 @@ public:
 
     /**
      * Returns a const reference to the first value.
-     * 
+     *
      * @return the const reference to the first value
      */
     const mapped_type& get_first_val() const noexcept { return first_val_; }
@@ -270,12 +270,6 @@ public:
         }
     }
 
-    void swap(interval_map& rhs)
-    {
-        std::swap(first_val_, rhs.first_val_);
-        c_.swap(rhs.c_);
-    }
-
     /**
      * Returns a const reference to the value that is mapped to a key equivalent to `key`.
      *
@@ -286,6 +280,12 @@ public:
     {
         iterator it = c_.upper_bound(key);
         return (it == c_.begin() ? first_val_ : std::prev(it)->second);
+    }
+
+    void swap(interval_map& rhs)
+    {
+        std::swap(first_val_, rhs.first_val_);
+        c_.swap(rhs.c_);
     }
 
     friend bool operator== <>(
