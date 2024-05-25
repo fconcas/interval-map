@@ -288,13 +288,6 @@ public:
         return (it == c_.begin() ? first_val_ : std::prev(it)->second);
     }
 
-    /**
-     * Returns the value of the internal container.
-     *
-     * @return the value of the internal container
-     */
-    const Container& get_container() const { return c_; }
-
     friend bool operator== <>(
         const interval_map<Key, T, Compare, Allocator, Container>& lhs,
         const interval_map<Key, T, Compare, Allocator, Container>& rhs
