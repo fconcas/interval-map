@@ -2,6 +2,7 @@
 #define _INTERVAL_MAP_HPP
 
 #include <map>
+#include <stdexcept>
 
 /**
  * Class implementing interval map.
@@ -89,11 +90,18 @@ public:
 
 protected:
     /**
-     * Default value.
+     * First value.
      *
      * Keys map to this value if no match is found in the map.
      */
     mapped_type first_val_{};
+
+    /**
+     * Has first value.
+     *
+     * True if a default value has been assigned, false otherwise.
+     */
+    bool has_first_val_{ false };
 
     /**
      * Internal map.
@@ -105,11 +113,17 @@ protected:
 public:
     /**
      * Constructor.
+     */
+    interval_map() {}
+
+    /**
+     * Constructor.
      *
      * @param first_val default value to which keys map if no match is found in the map.
      */
     interval_map(const T& first_val) :
-        first_val_(first_val)
+        first_val_(first_val),
+        has_first_val_(true)
     {}
 
     /**
@@ -120,6 +134,7 @@ public:
      */
     interval_map(const T& first_val, const Container& c) :
         first_val_(first_val),
+        has_first_val_(true),
         c_(c)
     {}
 
@@ -131,7 +146,8 @@ public:
      */
     interval_map(const T& first_val, std::initializer_list<value_type> init) :
         first_val_(first_val),
-        c_{ Container(init) }
+        has_first_val_(true),
+        c_(Container(init))
     {}
 
     iterator begin() noexcept { return c_.begin(); }
@@ -148,7 +164,9 @@ public:
     const_reverse_iterator crbegin() const noexcept { return c_.crbegin(); }
     const_reverse_iterator crend() const noexcept { return c_.crend(); }
 
-    [[nodiscard]] bool empty() const noexcept { return c_.empty(); }
+    [[nodiscard]] bool empty() const noexcept {
+        return (has_first_val_ ? false : c_.empty());
+    }
     size_type size() const { return c_.size(); }
     size_type max_size() const { return c_.max_size(); }
 
@@ -160,6 +178,7 @@ public:
     void set_first_val(const mapped_type& val)
     {
         first_val_ = val;
+        has_first_val_ = true;
 
         if (!c_.empty()) {
             auto it = c_.begin();
@@ -171,11 +190,20 @@ public:
     }
 
     /**
+     * Unsets the first value.
+     */
+    void reset_first_val() { has_first_val_ = false; }
+
+    /**
      * Returns a const reference to the first value.
      *
      * @return the const reference to the first value
      */
-    const mapped_type& get_first_val() const noexcept { return first_val_; }
+    const mapped_type& get_first_val() const
+    {
+        if (!has_first_val_)  throw std::out_of_range("interval_map::get_first_val");
+        return first_val_;
+    }
 
     /**
      * Manually inserts a pair to the map.
@@ -186,7 +214,7 @@ public:
     void insert(const key_type& key, const mapped_type& val)
     {
         // If the map is empty and value is equal to first_val_, do nothing
-        if (c_.empty() && val == first_val_)  return;
+        if (c_.empty() && has_first_val_ && val == first_val_)  return;
 
         // Find the position of the upper bound of key
         iterator it = c_.upper_bound(key);
@@ -199,23 +227,27 @@ public:
         // Get the value of the element that comes before key
         mapped_type prev_val = (it == c_.begin() ? first_val_ : std::prev(it)->second);
 
-        // Erase the current value if it's equal to the previous,
-        // move forward otherwise
-        if (val == prev_val) {
-            it = c_.erase(it);
+        // If the previous value doesn't exist, or the value is different from the previous value,
+        // move forward, otherwise erase the current value.
+        if ((it == c_.begin() && !has_first_val_) || (val != prev_val)) {
+            it++;
         }
         else {
-            it++;
+            it = c_.erase(it);
         }
 
         // Exit if the current element is the end
         if (it == c_.end())  return;
 
+        // If the current element is the beginning and there isn't a first value, no need to run
+        // the following lines.
+        if (it == c_.begin() && !has_first_val_)  return;
+
         // Get the value of the element that comes before the current element
         prev_val = (it == c_.begin() ? first_val_ : std::prev(it)->second);
 
         // Erase the current element if its value is equal to the value of
-        // the previous element
+        // the previous element, and the previous element exists
         if (it->second == prev_val) {
             c_.erase(it);
         }
@@ -234,13 +266,19 @@ public:
         if (key_begin >= key_end)  return;
 
         // If the map is empty and value is equal to first_val_, do nothing
-        if (c_.empty() && val == first_val_)  return;
+        if (c_.empty() && has_first_val_ && val == first_val_)  return;
 
         // Find the position of the upper bound of key_end
         iterator jt = c_.upper_bound(key_end);
 
         // Get the value to which key_end is mapped before the insertion
         mapped_type prev_val = (jt == c_.begin() ? first_val_ : std::prev(jt)->second);
+
+        // Cannot assign the range if a previous element does not exist
+        if (jt == c_.begin() && !has_first_val_)
+        {
+            throw std::out_of_range("interval_map::get_first_val");
+        }
 
         // Insert the value of key_end (emplace_hint is faster than insert_or_assign)
         jt = c_.emplace_hint(jt, key_end, prev_val);
@@ -257,8 +295,12 @@ public:
 
         // Erase all the previous values in the range (including key_begin
         // if its value is equal to the value of its previous element)
-        if (val != prev_val)  it++;
+        if ((it == c_.begin() && !has_first_val_) || val != prev_val)  it++;
         jt = c_.erase(it, jt);
+
+        // If the current element is the beginning and there isn't a first value, no need to run
+        // the following lines.
+        if (jt == c_.begin() && !has_first_val_)  return;
 
         // Get the value of the element before the erased range
         prev_val = (jt == c_.begin() ? first_val_ : std::prev(jt)->second);
@@ -279,12 +321,21 @@ public:
     const_reference at(const key_type& key) const
     {
         iterator it = c_.upper_bound(key);
-        return (it == c_.begin() ? first_val_ : std::prev(it)->second);
+
+        if (it == c_.begin()) {
+            if (!has_first_val_)  std::out_of_range("interval_map::at");
+
+            return first_val_;
+        }
+        else {
+            return std::prev(it)->second;
+        }
     }
 
     void swap(interval_map& rhs)
     {
         std::swap(first_val_, rhs.first_val_);
+        std::swap(has_first_val_, rhs.has_first_val_);
         c_.swap(rhs.c_);
     }
 
@@ -319,64 +370,6 @@ public:
         );
 };
 
-template<class Key, class T, class Compare, class Allocator, class Container>
-bool operator==(
-    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
-    const interval_map<Key, T, Compare, Allocator, Container>& rhs
-    )
-{
-    return lhs.first_val_ == rhs.first_val_ && lhs.c_ == rhs.c_;
-}
-
-template<class Key, class T, class Compare, class Allocator, class Container>
-bool operator!=(
-    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
-    const interval_map<Key, T, Compare, Allocator, Container>& rhs
-    )
-{
-    return lhs.first_val_ != rhs.first_val_ || lhs.c_ != rhs.c_;
-}
-
-template<class Key, class T, class Compare, class Allocator, class Container>
-bool operator<(
-    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
-    const interval_map<Key, T, Compare, Allocator, Container>& rhs
-    )
-{
-    if (lhs.first_val_ < rhs.first_val_)  return true;
-    return lhs.c_ < rhs.c_;
-}
-
-template<class Key, class T, class Compare, class Allocator, class Container>
-bool operator<=(
-    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
-    const interval_map<Key, T, Compare, Allocator, Container>& rhs
-    )
-{
-    if (lhs.first_val_ > rhs.first_val_)  return false;
-    return lhs.c_ <= rhs.c_;
-}
-
-template<class Key, class T, class Compare, class Allocator, class Container>
-bool operator>(
-    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
-    const interval_map<Key, T, Compare, Allocator, Container>& rhs
-)
-{
-    if (lhs.first_val_ > rhs.first_val_)  return true;
-    return lhs.c_ > rhs.c_;
-}
-
-template<class Key, class T, class Compare, class Allocator, class Container>
-bool operator>=(
-    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
-    const interval_map<Key, T, Compare, Allocator, Container>& rhs
-    )
-{
-    if (lhs.first_val_ < rhs.first_val_)  return false;
-    return lhs.c_ >= rhs.c_;
-}
-
 namespace std {
     template<class Key, class T, class Compare, class Allocator, class Container>
     void swap(
@@ -386,6 +379,82 @@ namespace std {
     {
         lhs.swap(rhs);
     }
+}
+
+template<class Key, class T, class Compare, class Allocator, class Container>
+bool operator==(
+    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
+    const interval_map<Key, T, Compare, Allocator, Container>& rhs
+    )
+{
+    return lhs.has_first_val_ == rhs.has_first_val_ &&
+        lhs.first_val_ == rhs.first_val_ &&
+        lhs.c_ == rhs.c_;
+}
+
+template<class Key, class T, class Compare, class Allocator, class Container>
+bool operator!=(
+    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
+    const interval_map<Key, T, Compare, Allocator, Container>& rhs
+    )
+{
+    return lhs.has_first_val_ != rhs.has_first_val_ ||
+        lhs.first_val_ != rhs.first_val_ ||
+        lhs.c_ != rhs.c_;
+}
+
+template<class Key, class T, class Compare, class Allocator, class Container>
+bool operator<(
+    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
+    const interval_map<Key, T, Compare, Allocator, Container>& rhs
+    )
+{
+    if (lhs.has_first_val_ < lhs.has_first_val_)  return true;
+    if (lhs.has_first_val_ > lhs.has_first_val_)  return false;
+    if (lhs.has_first_val_ && lhs.first_val_ < rhs.first_val_) return true;
+    return lhs.c_ < rhs.c_;
+}
+
+template<class Key, class T, class Compare, class Allocator, class Container>
+bool operator<=(
+    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
+    const interval_map<Key, T, Compare, Allocator, Container>& rhs
+    )
+{
+    if (lhs.has_first_val_ < lhs.has_first_val_)  return true;
+    if (lhs.has_first_val_ > lhs.has_first_val_)  return false;
+    if (lhs.has_first_val_) {
+        if (lhs.first_val_ > rhs.first_val_)  return false;
+        if (lhs.first_val_ < rhs.first_val_)  return true;
+    }
+    return lhs.c_ <= rhs.c_;
+}
+
+template<class Key, class T, class Compare, class Allocator, class Container>
+bool operator>(
+    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
+    const interval_map<Key, T, Compare, Allocator, Container>& rhs
+)
+{
+    if (lhs.has_first_val_ > lhs.has_first_val_)  return true;
+    if (lhs.has_first_val_ < lhs.has_first_val_)  return false;
+    if (lhs.has_first_val_ && lhs.first_val_ > rhs.first_val_) return true;
+    return lhs.c_ > rhs.c_;
+}
+
+template<class Key, class T, class Compare, class Allocator, class Container>
+bool operator>=(
+    const interval_map<Key, T, Compare, Allocator, Container>& lhs,
+    const interval_map<Key, T, Compare, Allocator, Container>& rhs
+    )
+{
+    if (lhs.has_first_val_ > lhs.has_first_val_)  return true;
+    if (lhs.has_first_val_ < lhs.has_first_val_)  return false;
+    if (lhs.has_first_val_) {
+        if (lhs.first_val_ < rhs.first_val_)  return false;
+        if (lhs.first_val_ > rhs.first_val_)  return true;
+    }
+    return lhs.c_ <= rhs.c_;
 }
 
 template <class Container>
