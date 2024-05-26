@@ -33,7 +33,7 @@ For example, in an interval map with an initial value $A$ and a map containing t
 - Consecutive map entries must not contain the same value (e.g. consecutive entries $(1, A)$ and $(3, A)$ are not valid).
 - Key type implements the `std::less` operator (but no other comparison operators).
 - Value type is hashable (or implements the equality operator).
-- Map entries must be modified by implementing a function `assign(key_begin, key_end, val)`, which assigns and overwrites value `val` ($v$) to keys between `key_begin` ($k_1$) included and `key_end` ($k_2$) excluded, that is, $[k_1, k_2)$.
-- An additional function `set_pair(key, val)`, which manually sets a pair (if doesn't violate the first specification) is provided. This can be useful, for example, to set a last value.
+- Map entries must be modified by implementing a function `insert_range(key_begin, key_end, val)`, which assigns and overwrites value `val` ($v$) to keys between `key_begin` ($k_1$) included and `key_end` ($k_2$) excluded, that is, $[k_1, k_2)$.
+- An additional function `insert(key, val)`, which manually sets a pair (if doesn't violate the first specification) is provided. This can be useful, for example, to set a last value.
 - When an interval $[k_1, k_2) \rightarrow v$ is inserted, it must overwrite all values that belonged to such interval before insertion.
 - If an interval replaces all intervals in the map, and the value is the map's initial value, the whole map should be emptied.
