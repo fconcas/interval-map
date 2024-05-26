@@ -275,8 +275,7 @@ public:
         mapped_type prev_val = (jt == c_.begin() ? first_val_ : std::prev(jt)->second);
 
         // Cannot assign the range if a previous element does not exist
-        if (jt == c_.begin() && !has_first_val_)
-        {
+        if (jt == c_.begin() && !has_first_val_) {
             throw std::out_of_range("interval_map::get_first_val");
         }
 
@@ -324,7 +323,6 @@ public:
 
         if (it == c_.begin()) {
             if (!has_first_val_)  std::out_of_range("interval_map::at");
-
             return first_val_;
         }
         else {
